@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from openai import OpenAI
 
 # Set up OpenAI client (uses Streamlit secrets)
-client = OpenAI(api_key="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 st.title("📌 Bowtie Diagram Generator + GPT-4 Suggestions")
 
