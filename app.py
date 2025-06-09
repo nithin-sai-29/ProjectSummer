@@ -1,66 +1,63 @@
 import streamlit as st
 import pandas as pd
+import networkx as nx
+import matplotlib.pyplot as plt
 import openai
 import os
 
-# ---------- OpenAI Setup ----------
-openai.api_key = st.secrets["OPENAI_API_KEY"]  # Or use a text_input if you're running locally
+# OpenAI API Key (Streamlit secrets or manual)
+openai.api_key = st.secrets["OPENAI_API_KEY"]  # Recommended
+# openai.api_key = "sk-..."  # For local testing only
 
-# ---------- Streamlit Interface ----------
-st.title("🧷 Bowtie Diagram Generator with AI Suggestions")
+st.title("📌 Bowtie Diagram Generator + GPT Suggestions")
 
-# Upload Excel file
-uploaded_file = st.file_uploader("Upload Excel file with 'Threats' and 'Consequences' sheets", type=["xlsx"])
+uploaded_file = st.file_uploader("Upload Excel with 'Threats' and 'Consequences'", type=['xlsx'])
 
 if uploaded_file:
-    # Read Excel sheets
-    df_threats = pd.read_excel(uploaded_file, sheet_name="Threats")
-    df_consequences = pd.read_excel(uploaded_file, sheet_name="Consequences")
+    df_threats = pd.read_excel(uploaded_file, sheet_name='Threats')
+    df_cons = pd.read_excel(uploaded_file, sheet_name='Consequences')
 
-    # Input central event
-    central_event = st.text_input("Enter the central event (hazard)", "Hazard_Event")
+    hazard = st.text_input("Enter Central Hazard/Event", "Hazard_Event")
 
-    # Generate Mermaid Diagram
-    mermaid_str = "```mermaid\ngraph TD\n"
+    # Create graph
+    G = nx.DiGraph()
+
+    # Add edges from threats to hazard
     for threat in df_threats["Threat"].dropna():
-        mermaid_str += f"{threat.replace(' ', '_')} --> {central_event.replace(' ', '_')}\n"
-    for consequence in df_consequences["Consequence"].dropna():
-        mermaid_str += f"{central_event.replace(' ', '_')} --> {consequence.replace(' ', '_')}\n"
-    mermaid_str += "```"
+        G.add_edge(threat, hazard)
 
-    st.markdown("### 📌 Bowtie Diagram")
-    st.markdown(mermaid_str)
+    # Add edges from hazard to consequences
+    for cons in df_cons["Consequence"].dropna():
+        G.add_edge(hazard, cons)
 
-    # AI Suggestions
-    st.markdown("### 🤖 AI Suggestions")
-    with st.spinner("Thinking..."):
-        threats_text = "\n".join(df_threats["Threat"].dropna().tolist())
-        consequences_text = "\n".join(df_consequences["Consequence"].dropna().tolist())
+    # Plot
+    st.subheader("📊 Bowtie Graph")
+    fig, ax = plt.subplots(figsize=(10, 6))
+    pos = nx.spring_layout(G, k=0.8)
+    nx.draw(G, pos, with_labels=True, arrows=True, node_size=2000, node_color='lightblue', font_size=10, ax=ax)
+    st.pyplot(fig)
 
-        prompt = f"""
-You are a risk and safety analysis expert. Based on the following threats and consequences, suggest:
-1. Potential missing threats
-2. Preventive controls (left side of Bowtie)
-3. Consequences not yet included
-4. Recovery controls (right side of Bowtie)
+    # GPT Analysis
+    with st.expander("🤖 AI Suggestions from GPT-4"):
+        with st.spinner("Generating suggestions..."):
+            prompt = f"""
+You are a safety expert. Based on these Bowtie diagram components, suggest:
+- Missing threats
+- Missing consequences
+- Preventive and recovery controls
 
-### Threats:
-{threats_text}
+Threats:
+{chr(10).join(df_threats['Threat'].dropna())}
 
-### Consequences:
-{consequences_text}
-
-Please list your suggestions clearly and concisely.
+Consequences:
+{chr(10).join(df_cons['Consequence'].dropna())}
 """
-
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are a risk assessment assistant helping build Bowtie diagrams."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.5
-        )
-
-        suggestions = response['choices'][0]['message']['content']
-        st.markdown(suggestions)
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are a Bowtie diagram assistant."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.6
+            )
+            st.markdown(response.choices[0].message.content)
