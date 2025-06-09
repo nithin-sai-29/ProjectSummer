@@ -4,41 +4,40 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from openai import OpenAI
 
-# Initialize OpenAI client with API key from secrets
+# Initialize OpenAI client
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# App title and config
 st.set_page_config(page_title="Bowtie Diagram Generator", layout="centered")
 st.title("📌 Bowtie Diagram Generator + GPT Suggestions")
 
-# Upload Excel file
-uploaded_file = st.file_uploader("Upload Excel with 'Threats' and 'Consequences' sheets", type=['xlsx'])
+uploaded_file = st.file_uploader("Upload Excel with 'Threats' and 'Consequences'", type=['xlsx'])
 
 if uploaded_file:
     try:
-        # Load Excel sheets
         df_threats = pd.read_excel(uploaded_file, sheet_name='Threats')
         df_cons = pd.read_excel(uploaded_file, sheet_name='Consequences')
 
-        # Input for hazard/event name
-        hazard = st.text_input("Enter Central Hazard/Event", "Hazard_Event")
+        hazard_input = st.text_input("Enter Central Hazard/Event", "Loss of Containment")
+        hazard = f"🔺 {hazard_input.strip()}"
 
-        # Build graph
+        # Create directed graph
         G = nx.DiGraph()
-        for threat in df_threats["Threat"].dropna():
-            G.add_edge(threat, hazard)
-        for cons in df_cons["Consequence"].dropna():
-            G.add_edge(hazard, cons)
 
-        # Draw the diagram
+        for threat in df_threats["Threat"].dropna():
+            G.add_edge(f"⚠️ {threat.strip()}", hazard)
+
+        for cons in df_cons["Consequence"].dropna():
+            G.add_edge(hazard, f"💥 {cons.strip()}")
+
+        # Draw the graph
         st.subheader("📊 Bowtie Diagram")
-        fig, ax = plt.subplots(figsize=(10, 6))
-        pos = nx.spring_layout(G, k=0.9)
+        fig, ax = plt.subplots(figsize=(12, 6))
+        pos = nx.spring_layout(G, k=0.9, seed=42)
         nx.draw(G, pos, with_labels=True, arrows=True,
-                node_size=2000, node_color='skyblue', font_size=10, ax=ax)
+                node_size=2500, node_color='lightblue', font_size=9, font_weight='bold', ax=ax)
         st.pyplot(fig)
 
-        # GPT Suggestions Section
+        # GPT Suggestions
         with st.expander("🤖 GPT-3.5 Suggestions"):
             with st.spinner("Calling GPT-3.5-turbo for suggestions..."):
                 prompt = f"""
