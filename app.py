@@ -6,7 +6,7 @@ import openai
 import os
 
 # OpenAI API Key (Streamlit secrets or manual)
-openai.api_key = st.secrets["OPENAI_API_KEY"]  # Recommended
+openai.api_key = "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"# Recommended
 # openai.api_key = "sk-..."  # For local testing only
 
 st.title("📌 Bowtie Diagram Generator + GPT Suggestions")
