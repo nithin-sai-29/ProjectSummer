@@ -2,94 +2,129 @@ import streamlit as st
 import pandas as pd
 import networkx as nx
 import matplotlib.pyplot as plt
+from openai import OpenAI
 
-# 🎯 Function to generate Bowtie Diagram with custom styling
-def generate_bowtie_diagram_styled(threats, consequences, top_event_text,
-                                    threat_color="deepskyblue", consequence_color="orangered",
-                                    top_event_color="orange", node_shape="s"):
-    top_event = top_event_text
-    G = nx.DiGraph()
+# Initialize OpenAI client
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-    for threat in threats:
-        G.add_edge(threat, top_event)
-    for consequence in consequences:
-        G.add_edge(top_event, consequence)
+st.set_page_config(page_title="Bowtie Diagram Generator", layout="wide")
+st.title("📌 Bowtie Diagram Generator + GPT Suggestions")
 
-    pos = {}
-    for i, threat in enumerate(threats):
-        pos[threat] = (-2, -i)
-    pos[top_event] = (0, -len(threats) / 2)
-    for i, consequence in enumerate(consequences):
-        pos[consequence] = (2, -i - 3)
-
-    fig, ax = plt.subplots(figsize=(14, 8))
-    nx.draw_networkx_edges(G, pos, ax=ax, edge_color='gray', arrows=True)
-
-    node_styles = {}
-    for node in G.nodes():
-        if node == top_event:
-            node_styles[node] = top_event_color
-        elif node in threats:
-            node_styles[node] = threat_color
-        else:
-            node_styles[node] = consequence_color
-
-    for color in set(node_styles.values()):
-        nodes = [n for n in node_styles if node_styles[n] == color]
-        nx.draw_networkx_nodes(G, pos, nodelist=nodes, node_color=color,
-                               node_shape=node_shape, node_size=3000, ax=ax)
-
-    nx.draw_networkx_labels(G, pos, ax=ax, font_size=8, font_weight="bold")
-    plt.axis("off")
-    plt.tight_layout()
-    return fig
-
-# 📌 Streamlit Interface
-st.set_page_config(page_title="Bowtie Diagram", layout="wide")
-st.title("📌 Customizable Bowtie Diagram Generator")
-
-uploaded_file = st.file_uploader("Upload Excel with 'Threats' and 'Consequences' sheets", type=['xlsx'])
+uploaded_file = st.file_uploader("📂 Upload Excel with 'Threats' and 'Consequences' sheets", type=["xlsx"])
 
 if uploaded_file:
     try:
-        df_threats = pd.read_excel(uploaded_file, sheet_name='Threats')
-        df_cons = pd.read_excel(uploaded_file, sheet_name='Consequences')
+        # List available sheet names for debugging
+        xls = pd.ExcelFile(uploaded_file)
+        st.sidebar.info(f"🧾 Sheets in file: {xls.sheet_names}")
 
-        threats = df_threats["Threat"].dropna().tolist()
-        consequences = df_cons["Consequence"].dropna().tolist()
+        # Read expected sheets
+        df_threats = pd.read_excel(xls, sheet_name='Threats')
+        df_cons = pd.read_excel(xls, sheet_name='Consequences')
 
-        st.sidebar.header("🎨 Styling Options")
-        threat_color = st.sidebar.color_picker("Threat Node Color", "#00BFFF")
-        consequence_color = st.sidebar.color_picker("Consequence Node Color", "#FF4500")
-        top_event_color = st.sidebar.color_picker("Top Event Color", "#FFA500")
+        # Dropdowns to confirm columns
+        threat_col = st.sidebar.selectbox("Select Threat Column", df_threats.columns)
+        consequence_col = st.sidebar.selectbox("Select Consequence Column", df_cons.columns)
 
-        shape_option = st.sidebar.selectbox(
-            "Node Shape",
-            {
-                "Square (s)": "s",
-                "Circle (o)": "o",
-                "Diamond (D)": "D",
-                "Triangle Up (^)": "^",
-                "Triangle Down (v)": "v"
-            }
-        )
+        threats = df_threats[threat_col].dropna().astype(str).tolist()
+        consequences = df_cons[consequence_col].dropna().astype(str).tolist()
 
-        top_event = st.text_input("Enter Top Event", "Loss of Containment\nwith hydrocarbon\nspilled to the bund")
+        # Central event input
+        hazard_input = st.text_input("Enter Central Event (Top Event)", "Loss of Containment")
+        hazard = f"[TOP] {hazard_input.strip()}"
 
+        # Styling Options
+        st.sidebar.header("🎨 Node Styling")
+        threat_color = st.sidebar.color_picker("Threat Color", "#00BFFF")
+        consequence_color = st.sidebar.color_picker("Consequence Color", "#FF6347")
+        top_color = st.sidebar.color_picker("Top Event Color", "#FFA500")
+        shape_option = st.sidebar.selectbox("Node Shape", {
+            "Square (s)": "s",
+            "Circle (o)": "o",
+            "Diamond (D)": "D",
+            "Triangle Up (^)": "^",
+            "Triangle Down (v)": "v"
+        })
+
+        # Build graph
+        G = nx.DiGraph()
+        labels = {}
+
+        for t in threats:
+            node = f"[THREAT] {t.strip()}"
+            G.add_edge(node, hazard)
+            labels[node] = node
+
+        for c in consequences:
+            node = f"[CONSEQ] {c.strip()}"
+            G.add_edge(hazard, node)
+            labels[node] = node
+
+        labels[hazard] = hazard
+
+        # Layout
+        pos = {}
+        for i, t in enumerate(threats):
+            pos[f"[THREAT] {t.strip()}"] = (-2, -i)
+
+        for i, c in enumerate(consequences):
+            pos[f"[CONSEQ] {c.strip()}"] = (2, -i)
+
+        pos[hazard] = (0, -len(threats) / 2)
+
+        # Draw diagram
         st.subheader("📊 Bowtie Diagram")
-        fig = generate_bowtie_diagram_styled(
-            threats,
-            consequences,
-            top_event_text=top_event,
-            threat_color=threat_color,
-            consequence_color=consequence_color,
-            top_event_color=top_event_color,
-            node_shape=shape_option
-        )
+        fig, ax = plt.subplots(figsize=(14, 8))
+        nx.draw_networkx_edges(G, pos, ax=ax, edge_color='gray', arrows=True)
+
+        # Draw nodes with colors
+        def draw_nodes(node_type, color):
+            nodes = [n for n in G.nodes if n.startswith(node_type)]
+            nx.draw_networkx_nodes(G, pos, nodelist=nodes, node_color=color,
+                                   node_size=3000, node_shape=shape_option, ax=ax)
+
+        draw_nodes("[THREAT]", threat_color)
+        draw_nodes("[TOP]", top_color)
+        draw_nodes("[CONSEQ]", consequence_color)
+
+        nx.draw_networkx_labels(G, pos, labels=labels, font_size=8, font_weight="bold", ax=ax)
+
+        plt.axis("off")
         st.pyplot(fig)
 
+        # GPT Section
+        with st.expander("🤖 GPT Suggestions"):
+            with st.spinner("Thinking..."):
+                prompt = f"""
+You are a risk expert. Given these threats and consequences in a Bowtie diagram, suggest:
+1. Additional threats
+2. Preventive controls
+3. Recovery controls
+4. Additional consequences
+
+### Threats:
+{chr(10).join(threats)}
+
+### Consequences:
+{chr(10).join(consequences)}
+"""
+                try:
+                    response = client.chat.completions.create(
+                        model="gpt-3.5-turbo",
+                        messages=[
+                            {"role": "system", "content": "You are a Bowtie diagram assistant."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.6
+                    )
+                    st.markdown(response.choices[0].message.content)
+                except Exception as gpt_error:
+                    st.error("❌ GPT API Error")
+                    st.code(str(gpt_error))
+
     except Exception as e:
-        st.error("⚠️ Error reading Excel file. Make sure it has 'Threats' and 'Consequences' sheets.")
+        st.error("⚠️ Failed to process the file.")
         st.code(str(e))
+
 else:
-    st.info("📂 Upload an Excel file to begin.")
+    st.info("Please upload an Excel file to begin.")
