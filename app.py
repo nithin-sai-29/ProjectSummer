@@ -63,13 +63,16 @@ if uploaded_file:
         consequence_color = st.sidebar.color_picker("Consequence Node Color", "#FF4500")
         top_event_color = st.sidebar.color_picker("Top Event Color", "#FFA500")
 
-        shape_option = st.sidebar.selectbox("Node Shape", {
-            "Square (s)": "s",
-            "Circle (o)": "o",
-            "Diamond (D)": "D",
-            "Triangle Up (^)": "^",
-            "Triangle Down (v)": "v"
-        })
+        shape_option = st.sidebar.selectbox(
+            "Node Shape",
+            {
+                "Square (s)": "s",
+                "Circle (o)": "o",
+                "Diamond (D)": "D",
+                "Triangle Up (^)": "^",
+                "Triangle Down (v)": "v"
+            }
+        )
 
         top_event = st.text_input("Enter Top Event", "Loss of Containment\nwith hydrocarbon\nspilled to the bund")
 
@@ -80,3 +83,13 @@ if uploaded_file:
             top_event_text=top_event,
             threat_color=threat_color,
             consequence_color=consequence_color,
+            top_event_color=top_event_color,
+            node_shape=shape_option
+        )
+        st.pyplot(fig)
+
+    except Exception as e:
+        st.error("⚠️ Error reading Excel file. Make sure it has 'Threats' and 'Consequences' sheets.")
+        st.code(str(e))
+else:
+    st.info("📂 Upload an Excel file to begin.")
