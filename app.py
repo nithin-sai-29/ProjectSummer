@@ -57,16 +57,23 @@ if uploaded_file:
 
         pos[hazard] = (0, 0)  # Center top event
 
-        # Draw diagram
+                # Draw diagram
         st.subheader("📊 Bowtie Diagram")
         fig, ax = plt.subplots(figsize=(14, 7))
         nx.draw(G, pos, with_labels=True, labels=labels,
                 node_size=2000, node_color="lightblue", font_size=9,
                 font_weight='bold', edge_color='gray', ax=ax)
         st.pyplot(fig)
-        plt.savefig("bowtie_diagram.pdf", format='pdf')
-        with open("bowtie_diagram.pdf", "rb") as f:
-            st.download_button("Download PDF", f, file_name="bowtie_diagram.pdf")
+
+        # Save to PDF
+        pdf_filename = "bowtie_diagram.pdf"
+        fig.savefig(pdf_filename, format='pdf')
+
+        # Download button
+        with open(pdf_filename, "rb") as f:
+            st.download_button("📥 Download as PDF", f, file_name=pdf_filename)
+
+        
 
 
         # GPT Suggestion Section
