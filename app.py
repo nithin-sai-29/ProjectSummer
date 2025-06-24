@@ -64,6 +64,10 @@ if uploaded_file:
                 node_size=2000, node_color="lightblue", font_size=9,
                 font_weight='bold', edge_color='gray', ax=ax)
         st.pyplot(fig)
+        plt.savefig("bowtie_diagram.pdf", format='pdf')
+        with open("bowtie_diagram.pdf", "rb") as f:
+            st.download_button("Download PDF", f, file_name="bowtie_diagram.pdf")
+
 
         # GPT Suggestion Section
         with st.expander("🤖 GPT Suggestions"):
